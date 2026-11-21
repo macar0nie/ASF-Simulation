@@ -74,7 +74,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   #legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
   #err{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px}
 </style>
-<script type="importmap">{"imports":{"three":"__THREE__three.module.js","three/addons/":"__THREE__"}}</script>
+
 </head><body>
 <div id="wrap">
   <canvas id="scene"></canvas>
@@ -94,7 +94,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   <div id="legend" class="panel"></div>
   <div id="err" class="panel"></div>
 </div>
-<script type="module">
+<script type="text/plain" id="main-code">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/BufferGeometryUtils.js';
@@ -322,7 +322,39 @@ function frame(now){
   controls.update(); renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
+window.__viewerStarted = true;
 requestAnimationFrame(frame);
+</script>
+<script>
+// Load Three.js: first from this app's own static folder, otherwise from a public CDN.
+// (The static folder only works if .streamlit/config.toml with enableStaticServing = true is deployed.)
+(async () => {
+  const LOCAL = '__THREE__';
+  const CDN = 'https://cdn.jsdelivr.net/npm/three@0.187.0/';
+  let local = false;
+  try {
+    const r = await fetch(LOCAL + 'three.module.js', { method: 'HEAD' });
+    local = r.ok && (r.headers.get('content-type') || '').includes('javascript');
+  } catch (e) { local = false; }
+  const imports = local
+    ? { 'three': LOCAL + 'three.module.js', 'three/addons/OrbitControls.js': LOCAL + 'OrbitControls.js', 'three/addons/BufferGeometryUtils.js': LOCAL + 'BufferGeometryUtils.js' }
+    : { 'three': CDN + 'build/three.module.js', 'three/addons/OrbitControls.js': CDN + 'examples/jsm/controls/OrbitControls.js', 'three/addons/BufferGeometryUtils.js': CDN + 'examples/jsm/utils/BufferGeometryUtils.js' };
+  const map = document.createElement('script');
+  map.type = 'importmap';
+  map.textContent = JSON.stringify({ imports });
+  document.head.appendChild(map);
+  const main = document.createElement('script');
+  main.type = 'module';
+  main.textContent = document.getElementById('main-code').textContent;
+  document.body.appendChild(main);
+  setTimeout(() => {
+    if (!window.__viewerStarted) {
+      const el = document.getElementById('err');
+      el.style.display = 'flex';
+      el.innerHTML = 'The 3D view could not load the Three.js library.<br>Check your internet connection, or deploy the <code>.streamlit</code> and <code>static</code> folders with the app.';
+    }
+  }, 12000);
+})();
 </script>
 </body></html>
 """
